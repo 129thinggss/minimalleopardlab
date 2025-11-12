@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Voronoi Leopard — Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bg: radial-gradient(circle at top, #1d1f22 0%, #0f0f10 45%, #0a0a0a 100%);
+        --muted: #888;
+        --accent: #f5d79b;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        opacity: 0;
+        transition: opacity .8s ease;
+      }
+      body.loaded { opacity: 1; }
+
+      header {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        width: 100%;
+        max-width: 1100px;
+        padding: 1rem 1rem .5rem;
+      }
+      header h2 {
+        margin: 0;
+        font-size: 1rem;
+        letter-spacing: .05em;
+      }
+      .home-btn {
+        position: absolute;
+        left: 1rem;
+        top: 1rem;
+        text-decoration: none;
+        font-size: .75rem;
+        color: var(--accent);
+        border: 1px solid rgba(245, 215, 155, 0.4);
+        padding: .25rem .6rem;
+        border-radius: 999px;
+        transition: all .25s ease;
+      }
+      .home-btn:hover {
+        background: rgba(245, 215, 155, .15);
+        transform: scale(1.05);
+        box-shadow: 0 0 6px rgba(245, 215, 155, .3);
+      }
+
+      main {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        align-items: flex-start;
+        max-width: 1100px;
+        width: 100%;
+        padding: 1rem 1rem 0;
+      }
+
+      aside {
+        background: rgba(8,8,9,0.45);
+        border: 1px solid rgba(255,255,255,0.02);
+        backdrop-filter: blur(10px);
+        border-radius: .9rem;
+        padding: 1rem;
+        width: 260px;
+      }
+      label { font-size:.68rem; display:block; margin-bottom:.25rem; }
+      input[type="range"] { width: 100%; accent-color: #fff; }
+      .control { margin-bottom: 1rem; }
+      .row { display:flex; justify-content:space-between; font-size:.6rem; color:#ccc; margin-bottom:.2rem; }
+
+      button {
+        border:none; border-radius:.55rem; padding:.45rem .7rem;
+        font-size:.6rem; cursor:pointer; transition:transform .09s ease-out;
+      }
+      button:active { transform: translateY(1px); }
+      .primary { background:#fff; color:#000; }
+      .ghost { background:rgba(255,255,255,0.04); color:#fff; }
+
+      .preview {
+        flex:1 1 600px;
+        display:flex; justify-content:center; align-items:center;
+        border:1px solid rgba(255,255,255,0.03);
+        border-radius:1rem;
+        background: radial-gradient(circle, rgba(255,255,255,0.01), rgba(0,0,0,0));
+      }
+      svg { width:600px; height:600px; transition:opacity .3s; }
+
+      #statusBar {
+        max-width:1100px;
+        width:100%;
+        padding:.4rem 1rem 1.2rem;
+        font-size:.6rem;
+        color:var(--muted);
+      }
+
+      /* --- archive --- */
+      #archiveWrapper {
+        max-width: 1100px;
+        width: 100%;
+        padding: 0 1rem 2.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+      .archive-section {
+        background: rgba(6,6,7,0.3);
+        border: 1px solid rgba(255,255,255,0.01);
+        border-radius: .75rem;
+        padding: .8rem .8rem 1rem;
+      }
+      .archive-section-title {
+        font-size: .68rem;
+        color: #e9e9e9;
+        margin-bottom: .55rem;
+        display: flex;
+        align-items: center;
+        gap: .35rem;
+      }
+      .archive-section-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: radial-gradient(circle, rgba(255,255,255,0.25), rgba(255,255,255,0));
+      }
+      .archive-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+        gap: .6rem;
+      }
+      .arch-item {
+        background: rgba(255,255,255,0.015);
+        border: 1px solid rgba(255,255,255,0.008);
+        border-radius: .55rem;
+        overflow: hidden;
+        transition: transform .12s ease-out, box-shadow .12s ease-out;
+      }
+      .arch-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 35px rgba(0,0,0,.25);
+      }
+      .arch-thumb {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        background-size: cover;
+        background-position: center;
+      }
+      .arch-meta {
+        font-size: .53rem;
+        padding: .32rem .4rem .4rem;
+        color: #aaa;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .badge {
+        background: rgba(159,233,255,0.08);
+        border: 1px solid rgba(159,233,255,0.25);
+        border-radius: 999px;
+        padding: .12rem .45rem;
+        font-size: .55rem;
+        color: #fff;
+      }
+
+      .leopard-status {
+        font-weight: 500;
+        color: #f5d79b;
+        display: inline-block;
+        margin-top: 0.25rem;
+        text-shadow: 0 0 4px rgba(245, 215, 155, 0.35);
+      }
+
+      @media (max-width: 960px) {
+        main { flex-direction: column; }
+        .preview svg { width: 100%; height: auto; max-height: 520px; }
+        .home-btn { left: .8rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h2>Minimal Leopard Lab</h2>
+      <a href="#" class="home-btn" onclick="goHome(event)">← Home</a>
+    </header>
+
+    <main>
+      <aside>
+        <div class="control">
+          <label>텍스처 업로드 (PNG/JPG)</label>
+          <input type="file" id="texInput" accept="image/*" />
+          <div id="texStatus" style="font-size:.6rem;color:#aaa;margin-top:.3rem;">아직 텍스처 없음</div>
+        </div>
+        <div class="control"><div class="row"><span>셀 개수</span><span id="count-val"></span></div><input id="count" type="range" min="10" max="120" value="70"></div>
+        <div class="control"><div class="row"><span>모서리 둥글기</span><span id="round-val"></span></div><input id="round" type="range" min="0" max="40" value="16"></div>
+        <div class="control"><div class="row"><span>도넛 폭</span><span id="band-val"></span></div><input id="band" type="range" min="5" max="35" value="18"></div>
+        <div class="control"><div class="row"><span>Turbulence</span><span id="turb-val"></span></div><input id="turb" type="range" min="0" max="50" value="10"></div>
+        <div class="control"><div class="row"><span>Displace</span><span id="disp-val"></span></div><input id="disp" type="range" min="0" max="40" value="10"></div>
+        <div class="control"><div class="row"><span>셀 간격</span><span id="gap-val"></span></div><input id="gap" type="range" min="-10" max="20" value="0"></div>
+        <div class="control"><label><input id="invert" type="checkbox"> 색 반전</label></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem;">
+          <button id="randomize" class="primary">랜덤</button>
+          <button id="download" class="ghost">PNG 저장 & 아카이브</button>
+        </div>
+      </aside>
+      <section class="preview"><svg id="canvas"></svg></section>
+    </main>
+
+    <div id="archiveWrapper">
+      <div class="archive-section">
+        <div class="archive-section-title">
+          오늘의 패턴들 <small style="color:#666;font-size:.57rem;">최근 저장 순으로 최대 12개</small>
+        </div>
+        <div id="archive-latest" class="archive-grid"></div>
+      </div>
+      <div class="archive-section">
+        <div class="archive-section-title">
+          가장 유사한 군집 <span class="badge">round 비슷</span>
+        </div>
+        <div id="archive-cluster" class="archive-grid"></div>
+      </div>
+      <div class="archive-section">
+        <div class="archive-section-title">
+          가장 변이도가 높은 패턴 <small style="color:#666;font-size:.57rem;">turb + disp 높은 순</small>
+        </div>
+        <div id="archive-variant" class="archive-grid"></div>
+      </div>
+    </div>
+
+    <div id="statusBar">아카이브 상태 대기 중...</div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+    <script>
+      // 페이지 페이드인
+      window.addEventListener("load", () => {
+        document.body.classList.add("loaded");
+      });
+
+      // Home 버튼
+      function goHome(e) {
+        e.preventDefault();
+        document.body.style.opacity = 0;
+        setTimeout(() => { window.location.href = "index.html"; }, 700);
+      }
+
+      // DOM
+      const svg = document.getElementById("canvas");
+      const texInput = document.getElementById("texInput");
+      const texStatus = document.getElementById("texStatus");
+      const statusBar = document.getElementById("statusBar");
+      const controls = ["count","round","band","turb","disp","gap"];
+      const inputs = Object.fromEntries(controls.map(id=>[id,document.getElementById(id)]));
+      const labels = Object.fromEntries(controls.map(id=>[id,document.getElementById(id+"-val")]));
+      const invert = document.getElementById("invert");
+      const randomBtn = document.getElementById("randomize");
+      const downloadBtn = document.getElementById("download");
+
+      const latestGrid = document.getElementById("archive-latest");
+      const clusterGrid = document.getElementById("archive-cluster");
+      const variantGrid = document.getElementById("archive-variant");
+
+      const W=600,H=600;
+      let seed=Math.random(),fixedSeed=seed,textureDataURL=null;
+      let db = null;
+
+      // Firebase init
+      try {
+        const firebaseConfig = {
+          apiKey: "AIzaSyC0xPZVpoWxdTyMqpizkkm8_KnpIuHitbo",
+          authDomain: "voronoileopardlab.firebaseapp.com",
+          projectId: "voronoileopardlab",
+          storageBucket: "voronoileopardlab.firebasestorage.app",
+          messagingSenderId: "607023840475",
+          appId: "1:607023840475:web:b6ec95afac8160966e20fe",
+          measurementId: "G-755PLGG0S1"
+        };
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        statusBar.innerHTML = "<span style='color:#9fe9ff'>Firebase 연결됨, 아카이브 불러오는 중...</span>";
+      } catch (e) {
+        console.log(e);
+        statusBar.innerHTML = "<span style='color:#f88'>Firebase 연결 실패 (생성은 가능)</span>";
+      }
+
+      // voronoi utilities
+      const rnd=()=> (seed=(seed*9301+49297)%233280)/233280;
+      const centroid=poly=>poly.reduce(([x,y],[px,py])=>[x+px,y+py],[0,0]).map(v=>v/poly.length);
+      const insetPolygon=(poly,dist)=>{const c=centroid(poly);return poly.map(([x,y])=>[x-(x-c[0])*dist,y-(y-c[1])*dist])};
+      const lineIntersect=(p1,p2,a,b,c)=>{const[x1,y1]=p1,[x2,y2]=p2,dx=x2-x1,dy=y2-y1,den=a*dx+b*dy;if(Math.abs(den)<1e-6)return null;const t=-(a*x1+b*y1+c)/den;return[x1+t*dx,y1+t*dy]};
+      const clipPolygon=(poly,a,b,c)=>{const out=[];for(let i=0;i<poly.length;i++){const p1=poly[i],p2=poly[(i+1)%poly.length],d1=a*p1[0]+b*p1[1]+c,d2=a*p2[0]+b*p2[1]+c,in1=d1>=0,in2=d2>=0;if(in1&&in2)out.push(p2);else if(in1&&!in2){const inter=lineIntersect(p1,p2,a,b,c);if(inter)out.push(inter)}else if(!in1&&in2){const inter=lineIntersect(p1,p2,a,b,c);if(inter)out.push(inter);out.push(p2)}}return out};
+      const makeRoundedPath=(pts,r)=>{if(!pts.length)return"";let d="";for(let i=0;i<pts.length;i++){const p0=pts[(i-1+pts.length)%pts.length],p1=pts[i],p2=pts[(i+1)%pts.length],v1=[p1[0]-p0[0],p1[1]-p0[1]],v2=[p2[0]-p1[0],p2[1]-p1[1]],l1=Math.hypot(...v1),l2=Math.hypot(...v2),r1=Math.min(r,l1/2),r2=Math.min(r,l2/2),p1a=[p1[0]-(v1[0]/l1)*r1,p1[1]-(v1[1]/l1)*r1],p1b=[p1[0]+(v2[0]/l2)*r2,p1[1]+(v2[1]/l2)*r2];if(!i)d+=`M${p1a[0]},${p1a[1]} `;else d+=`L${p1a[0]},${p1a[1]} `;d+=`Q${p1[0]},${p1[1]} ${p1b[0]},${p1b[1]} `}return d+"Z"};
+
+      function draw() {
+        if (!textureDataURL) {
+          svg.innerHTML = "<text x='50%' y='50%' text-anchor='middle' fill='#888' font-size='13'>텍스처를 업로드하세요</text>";
+          return;
+        }
+        svg.innerHTML = "";
+
+        const defs=document.createElementNS("http://www.w3.org/2000/svg","defs");
+        svg.appendChild(defs);
+
+        const filter=document.createElementNS("http://www.w3.org/2000/svg","filter");
+        filter.id="noise";
+        const feT=document.createElementNS("http://www.w3.org/2000/svg","feTurbulence");
+        feT.setAttribute("type","fractalNoise");
+        feT.setAttribute("baseFrequency",(inputs.turb.value/1000).toFixed(3));
+        feT.setAttribute("numOctaves","2");
+        const feD=document.createElementNS("http://www.w3.org/2000/svg","feDisplacementMap");
+        feD.setAttribute("in","SourceGraphic");
+        feD.setAttribute("scale",inputs.disp.value);
+        feD.setAttribute("xChannelSelector","R");
+        feD.setAttribute("yChannelSelector","G");
+        filter.append(feT,feD);
+        defs.appendChild(filter);
+
+        seed = fixedSeed;
+        const n=+inputs.count.value,roundness=+inputs.round.value,band=+inputs.band.value,gap=+inputs.gap.value;
+        const pts=Array.from({length:n},()=>[rnd()*W,rnd()*H]);
+
+        for(let i=0;i<n;i++){
+          let cell=[[0,0],[W,0],[W,H],[0,H]];
+          const pi=pts[i];
+          for(let j=0;j<n;j++){
+            if(i===j) continue;
+            const pj=pts[j];
+            let a=pj[0]-pi[0],b=pj[1]-pi[1];
+            const mx=(pi[0]+pj[0])/2,my=(pi[1]+pj[1])/2;
+            let c=-(a*mx+b*my);
+            if(a*pi[0]+b*pi[1]+c<0){a=-a;b=-b;c=-c;}
+            cell=clipPolygon(cell,a,b,c);
+            if(!cell.length) break;
+          }
+          if(!cell.length) continue;
+          cell=insetPolygon(cell,gap/200);
+          const outerRatio=0.22,innerRatio=Math.min(outerRatio+band/100,0.9);
+          const dOuter=makeRoundedPath(insetPolygon(cell,outerRatio),roundness*0.5);
+          const dInner=makeRoundedPath(insetPolygon(cell,innerRatio),roundness*0.35);
+
+          const patId=`tex-${i}`;
+          const pat=document.createElementNS("http://www.w3.org/2000/svg","pattern");
+          pat.id=patId;pat.setAttribute("patternUnits","userSpaceOnUse");
+          pat.setAttribute("width",W);pat.setAttribute("height",H);
+          const img=document.createElementNS("http://www.w3.org/2000/svg","image");
+          img.setAttributeNS("http://www.w3.org/1999/xlink","href",textureDataURL);
+          img.setAttribute("width",W);img.setAttribute("height",H);
+          if (invert.checked) img.style.filter="invert(1)";
+          const rot=(rnd()*30-15).toFixed(2),scale=(0.6+rnd()*0.7).toFixed(2);
+          pat.setAttribute("patternTransform",`rotate(${rot} ${W/2} ${H/2}) scale(${scale})`);
+          pat.appendChild(img);defs.appendChild(pat);
+
+          const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+          path.setAttribute("d",`${dOuter} ${dInner}`);
+          path.setAttribute("fill",`url(#${patId})`);
+          path.setAttribute("fill-rule","evenodd");
+          path.setAttribute("filter","url(#noise)");
+          svg.appendChild(path);
+        }
+      }
+
+      // 현재 파라미터 문자열
+      function getCurrentParamsAsText() {
+        return `count:${inputs.count.value}, round:${inputs.round.value}, band:${inputs.band.value}, turb:${inputs.turb.value}, disp:${inputs.disp.value}, gap:${inputs.gap.value}, invert:${invert.checked ? "1":"0"}`;
+      }
+
+      // 파라미터 파싱
+      function parseParams(str='') {
+        const obj = {};
+        str.split(',').forEach(pair => {
+          const [k,v] = pair.split(':').map(s=>s && s.trim());
+          if (k && v !== undefined) obj[k] = v;
+        });
+        return obj;
+      }
+
+      // Firestore에서 불러와서 3개 섹션 채우기
+      function fetchArchive() {
+        if (!db) {
+          statusBar.innerHTML = "<span style='color:#f88'>Firestore 없음, 아카이브 표시 불가</span>";
+          return;
+        }
+        db.collection("leopardArchive")
+          .orderBy("createdAt", "desc")
+          .limit(120)
+          .get()
+          .then(snap => {
+            const items = [];
+            snap.forEach(doc => {
+              const d = doc.data();
+              if (d.dataURL) {
+                items.push({
+                  dataURL: d.dataURL,
+                  params: d.params || "",
+                  createdAt: d.createdAt ? d.createdAt.toDate().toISOString().slice(0,19).replace("T"," ") : ""
+                });
+              }
+            });
+            renderArchiveSections(items);
+            statusBar.innerHTML = `<span style="color:#9fe9ff">Firestore에서 ${items.length}개 불러옴</span>`;
+          })
+          .catch(err => {
+            console.log(err);
+            statusBar.innerHTML = "<span style='color:#f88'>아카이브 불러오기 실패</span>";
+          });
+      }
+
+      function renderArchiveSections(items) {
+        // 1) 최신
+        latestGrid.innerHTML = "";
+        items.slice(0,12).forEach(item => {
+          const el = document.createElement("div");
+          el.className = "arch-item";
+          const thumb = document.createElement("div");
+          thumb.className = "arch-thumb";
+          thumb.style.backgroundImage = `url(${item.dataURL})`;
+          const meta = document.createElement("div");
+          meta.className = "arch-meta";
+          meta.textContent = item.createdAt;
+          el.appendChild(thumb);
+          el.appendChild(meta);
+          latestGrid.appendChild(el);
+        });
+
+        // 파라미터 파싱
+        const parsed = items.map(it => ({...it, parsed: parseParams(it.params)}));
+
+        // 2) 변이도 높은 패턴
+        variantGrid.innerHTML = "";
+        const scored = parsed.map(it => {
+          const t = Number(it.parsed.turb || 0);
+          const d = Number(it.parsed.disp || 0);
+          const g = Math.abs(Number(it.parsed.gap || 0));
+          return { ...it, _varScore: t + d + g };
+        }).sort((a,b)=>b._varScore - a._varScore);
+        scored.slice(0,6).forEach(item => {
+          const el = document.createElement("div");
+          el.className = "arch-item";
+          const thumb = document.createElement("div");
+          thumb.className = "arch-thumb";
+          thumb.style.backgroundImage = `url(${item.dataURL})`;
+          const meta = document.createElement("div");
+          meta.className = "arch-meta";
+          meta.textContent = `변이도: ${item._varScore}`;
+          el.appendChild(thumb); el.appendChild(meta);
+          variantGrid.appendChild(el);
+        });
+
+        // 3) round 군집
+        clusterGrid.innerHTML = "";
+        const buckets = {};
+        parsed.forEach(it => {
+          const r = Number(it.parsed.round || 0);
+          const key = Math.round(r/5)*5;
+          if (!buckets[key]) buckets[key] = [];
+          buckets[key].push(it);
+        });
+        const clusterKeys = Object.keys(buckets);
+        if (clusterKeys.length) {
+          let bestKey = clusterKeys[0];
+          clusterKeys.forEach(k => {
+            if (buckets[k].length > buckets[bestKey].length) bestKey = k;
+          });
+          buckets[bestKey].slice(0,8).forEach(item => {
+            const el = document.createElement("div");
+            el.className = "arch-item";
+            const thumb = document.createElement("div");
+            thumb.className = "arch-thumb";
+            thumb.style.backgroundImage = `url(${item.dataURL})`;
+            const meta = document.createElement("div");
+            meta.className = "arch-meta";
+            meta.textContent = `round ≈ ${bestKey}`;
+            el.appendChild(thumb); el.appendChild(meta);
+            clusterGrid.appendChild(el);
+          });
+        }
+      }
+
+      // 저장 + Firestore 업로드
+      downloadBtn.addEventListener("click", () => {
+        const serializer=new XMLSerializer();
+        const svgData=serializer.serializeToString(svg);
+        const blob=new Blob([svgData],{type:"image/svg+xml;charset=utf-8"});
+        const url=URL.createObjectURL(blob);
+        const img=new Image();
+        img.onload=function(){
+          const canvas=document.createElement("canvas");
+          canvas.width=W;canvas.height=H;
+          const ctx=canvas.getContext("2d");
+          ctx.drawImage(img,0,0);
+          const pngURL=canvas.toDataURL("image/png");
+
+          // 로컬 다운로드
+          const a=document.createElement("a");
+          a.href=pngURL;a.download="voronoi_leopard.png";a.click();
+
+          if (!db) return;
+
+          db.collection("leopardArchive").add({
+            dataURL: pngURL,
+            params: getCurrentParamsAsText(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(() => {
+            statusBar.innerHTML = "<span style='color:#9fe9ff'>Firestore에 저장됨</span>";
+            fetchArchive();
+          }).catch(err => {
+            console.log(err);
+            statusBar.innerHTML = "<span style='color:#f88'>저장 실패</span>";
+          });
+
+        };
+        img.src=url;
+      });
+
+      // 업로드 → 텍스처 적용 표시 + draw
+      texInput.addEventListener("change", e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          textureDataURL = ev.target.result;
+          texStatus.innerHTML = "<span class='leopard-status'>🐆 텍스처 적용됨</span>";
+          const el = texStatus.querySelector(".leopard-status");
+          el.animate(
+            [
+              { transform: "scale(0.5)", opacity: 0 },
+              { transform: "scale(1.15)", opacity: 1 },
+              { transform: "scale(1)", opacity: 1 }
+            ],
+            { duration: 450, easing: "ease-out" }
+          );
+          draw();
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // 컨트롤
+      controls.forEach(id => {
+        inputs[id].addEventListener("input", () => {
+          labels[id].textContent = inputs[id].value;
+          draw();
+        });
+      });
+      randomBtn.addEventListener("click", () => {
+        fixedSeed = Math.random();
+        draw();
+      });
+      invert.addEventListener("input", () => draw());
+
+      // 초기 실행
+      document.addEventListener("DOMContentLoaded", () => {
+        controls.forEach(id => labels[id].textContent = inputs[id].value);
+        draw();
+        fetchArchive();
+      });
+    </script>
+  </body>
+</html>
+

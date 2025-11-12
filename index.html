@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minimal Leopard Lab</title>
+  <style>
+    :root {
+      --accent: #f5d79b;
+      --bg: #0a0a0a;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      font-family: 'Helvetica Neue', system-ui, sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    /* ===== 배경 그리드 (한 줄) ===== */
+    .pattern-row {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: grid;
+      grid-template-columns: repeat(8, 150px);
+      gap: 14px;
+      opacity: 0.23;
+      pointer-events: none;
+      filter: saturate(0.9);
+    }
+
+    .thumb {
+      width: 150px;
+      height: 150px;
+      border-radius: .6rem;
+      overflow: hidden;
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.02);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+      position: relative;
+    }
+
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: opacity .4s ease;
+    }
+
+    .thumb.fading img {
+      opacity: 0;
+    }
+
+    /* ===== 중앙 타이틀 ===== */
+    .content {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 5;
+      background: rgba(10,10,10,0.45);
+      backdrop-filter: blur(10px);
+      padding: 2.2rem 2.8rem 2.4rem;
+      border-radius: 1.1rem;
+      border: 1px solid rgba(245,215,155,0.1);
+      box-shadow: 0 10px 50px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      font-size: 3rem;
+      letter-spacing: 0.05em;
+      font-weight: 400;
+      color: var(--accent);
+      text-shadow: 0 0 10px rgba(245, 215, 155, 0.3);
+      margin-bottom: .6rem;
+    }
+
+    p {
+      font-size: 0.9rem;
+      color: #d7d7d7;
+      margin-top: 0.5rem;
+      letter-spacing: 0.05em;
+    }
+
+    button {
+      margin-top: 2rem;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid rgba(245, 215, 155, 0.4);
+      padding: 0.6rem 1.8rem;
+      border-radius: 2rem;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      background: rgba(245, 215, 155, 0.1);
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(245, 215, 155, 0.3);
+    }
+
+    @media (max-width: 1100px) {
+      .pattern-row {
+        grid-template-columns: repeat(5, 120px);
+      }
+      .thumb {
+        width: 120px;
+        height: 120px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .content {
+        width: calc(100% - 3rem);
+        padding: 1.8rem 1.5rem 2rem;
+      }
+      h1 { font-size: 2.2rem; }
+
+      .pattern-row {
+        grid-template-columns: repeat(3, 110px);
+        gap: 10px;
+      }
+      .thumb {
+        width: 110px;
+        height: 110px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 뒤에서 Firestore 이미지들이 자리 바꿀 곳 -->
+  <div class="pattern-row" id="patternRow">
+    <!-- JS에서 칸 채움 -->
+  </div>
+
+  <!-- 앞에 보이는 내용 -->
+  <div class="content">
+    <h1>Minimal Leopard Lab</h1>
+    <p>organic patterns & experimental identity</p>
+    <button onclick="gotoGenerator()">Enter Pattern Generator →</button>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+  <script>
+    function gotoGenerator() {
+      window.location.href = "generator.html";
+    }
+
+    // 1) Firebase init
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0xPZVpoWxdTyMqpizkkm8_KnpIuHitbo",
+      authDomain: "voronoileopardlab.firebaseapp.com",
+      projectId: "voronoileopardlab",
+      storageBucket: "voronoileopardlab.firebasestorage.app",
+      messagingSenderId: "607023840475",
+      appId: "1:607023840475:web:b6ec95afac8160966e20fe",
+      measurementId: "G-755PLGG0S1"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const row = document.getElementById("patternRow");
+    const SLOT_COUNT = 8; // 한 줄에 몇 칸 보일지
+
+    // 2) Firestore에서 이미지 가져오기
+    async function fetchImages() {
+      try {
+        const snap = await db.collection("leopardArchive")
+          .orderBy("createdAt", "desc")
+          .limit(30)   // 넉넉하게
+          .get();
+
+        let urls = [];
+        snap.forEach(doc => {
+          const d = doc.data();
+          if (d.dataURL) urls.push(d.dataURL);
+        });
+
+        // 아무것도 없을 때 대비
+        if (!urls.length) {
+          urls = Array.from({length: 10}, (_,i) => `https://picsum.photos/seed/leopard${i}/400/400`);
+        }
+
+        setupGrid(urls);
+      } catch (err) {
+        console.error(err);
+        // 실패하면 placeholder라도
+        const urls = Array.from({length: 10}, (_,i) => `https://picsum.photos/seed/leopard${i}/400/400`);
+        setupGrid(urls);
+      }
+    }
+
+    // 3) 그리드 칸 만들기
+    function setupGrid(urls) {
+      // 먼저 비어있는 슬롯 만들기
+      for (let i = 0; i < SLOT_COUNT; i++) {
+        const div = document.createElement("div");
+        div.className = "thumb";
+        const img = document.createElement("img");
+        // 초기 이미지
+        img.src = urls[i % urls.length];
+        div.appendChild(img);
+        row.appendChild(div);
+      }
+
+      // 1.7초마다 랜덤 칸 교체
+      setInterval(() => {
+        const thumbs = document.querySelectorAll(".thumb");
+        if (!thumbs.length) return;
+
+        const randomSlot = thumbs[Math.floor(Math.random() * thumbs.length)];
+        const imgEl = randomSlot.querySelector("img");
+        const newUrl = urls[Math.floor(Math.random() * urls.length)];
+
+        // 같은 이미지면 안 바꿔도 됨
+        if (imgEl.src === newUrl) return;
+
+        // 페이드아웃 클래스
+        randomSlot.classList.add("fading");
+        setTimeout(() => {
+          imgEl.src = newUrl;
+          randomSlot.classList.remove("fading");
+        }, 350);
+      }, 1700);
+    }
+
+    fetchImages();
+  </script>
+</body>
+</html>
+
